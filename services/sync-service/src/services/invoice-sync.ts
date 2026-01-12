@@ -1,4 +1,4 @@
-import { QuickBooks, logger } from '@quickbooks-integration/lib';
+import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
 import { invoiceRepository, syncStateRepository } from '../repositories';
 
 export class InvoiceSyncService {
@@ -26,9 +26,10 @@ export class InvoiceSyncService {
       const cursor = state.cursor;
 
       // Build query
+      const maxResults = config.quickbooks.maxResults;
       const query = cursor
-        ? `SELECT * FROM Invoice WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS 1000`
-        : `SELECT * FROM Invoice MAXRESULTS 1000`;
+        ? `SELECT * FROM Invoice WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS ${maxResults}`
+        : `SELECT * FROM Invoice MAXRESULTS ${maxResults}`;
 
       logger.debug(`Executing invoice query: ${query}`);
 

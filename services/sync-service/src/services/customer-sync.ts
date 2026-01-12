@@ -1,4 +1,4 @@
-import { QuickBooks, logger } from '@quickbooks-integration/lib';
+import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
 import { customerRepository, syncStateRepository } from '../repositories';
 
 export class CustomerSyncService {
@@ -26,9 +26,10 @@ export class CustomerSyncService {
       const cursor = state.cursor;
 
       // Build query
+      const maxResults = config.quickbooks.maxResults;
       const query = cursor
-        ? `SELECT * FROM Customer WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS 1000`
-        : `SELECT * FROM Customer MAXRESULTS 1000`;
+        ? `SELECT * FROM Customer WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS ${maxResults}`
+        : `SELECT * FROM Customer MAXRESULTS ${maxResults}`;
 
       logger.debug(`Executing customer query: ${query}`);
 

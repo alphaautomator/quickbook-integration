@@ -16,7 +16,8 @@ export const config = {
     authUrl: process.env.QB_ENVIRONMENT === 'production'
       ? 'https://appcenter.intuit.com/connect/oauth2'
       : 'https://appcenter.intuit.com/connect/oauth2',
-    tokenUrl: 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
+    tokenUrl: 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer',
+    maxResults: parseInt(process.env.QB_MAX_RESULTS || '1000', 10)
   },
   database: {
     path: process.env.DATABASE_PATH || './quickbooks.db'
