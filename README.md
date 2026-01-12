@@ -184,6 +184,20 @@ If a sync fails, the cursor is preserved so the next sync resumes from where it 
 - `last_sync_attempt`, `last_sync_success`: Timestamps
 - `error_message`: If failed, why
 
+**sync_history** - Historical log of all sync operations
+- `id`: Auto-incrementing primary key
+- `realm_id`: Company identifier
+- `object_type`: 'customer' or 'invoice'
+- `status`: 'success', 'failure', or 'partial'
+- `records_synced`: Number of records successfully synced
+- `records_failed`: Number of records that failed
+- `duration_ms`: How long the sync took (milliseconds)
+- `cursor_before`: Cursor value before sync
+- `cursor_after`: Cursor value after sync
+- `error_message`: Error details if sync failed
+- `started_at`: When sync started (Unix timestamp)
+- `completed_at`: When sync completed (Unix timestamp)
+
 ## Development
 
 ### Build
@@ -219,6 +233,31 @@ sqlite3 quickbooks.db
 > SELECT COUNT(*) FROM customers;
 > SELECT * FROM sync_state;
 ```
+
+### View Sync History
+
+View historical sync operations:
+
+```bash
+# Show summary
+npm run sync-history
+
+# Show detailed history
+npm run sync-history -- --full
+
+# Show last 20 operations
+npm run sync-history -- --full --limit 20
+
+# Filter by object type
+npm run sync-history -- --full --type customer
+```
+
+The sync history tracks every sync operation including:
+- When it ran and how long it took
+- How many records were synced
+- Whether it succeeded or failed
+- The cursor positions before and after
+- Any error messages
 
 ### Logs
 

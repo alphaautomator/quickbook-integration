@@ -110,9 +110,35 @@ ORDER BY object_type;
 EOF
 echo ""
 
+# Sync History Summary
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 SYNC HISTORY (Last 5 operations)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+HISTORY_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sync_history;")
+if [ "$HISTORY_COUNT" -gt 0 ]; then
+    sqlite3 "$DB_PATH" <<EOF
+.mode column
+.headers on
+SELECT 
+    object_type,
+    status,
+    records_synced,
+    records_failed,
+    CAST(duration_ms AS TEXT) || 'ms' as duration,
+    datetime(started_at/1000, 'unixepoch') as started_at
+FROM sync_history
+ORDER BY started_at DESC
+LIMIT 5;
+EOF
+else
+    echo "No sync history yet. Run the sync service to start logging."
+fi
+echo ""
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "💡 Tips:"
 echo "  - Use 'sqlite3 $DB_PATH' for interactive SQL"
 echo "  - View raw JSON: SELECT json(raw_data) FROM customers LIMIT 1;"
+echo "  - View full sync history: npm run sync-history -- --full"
 echo "  - Reset sync: DELETE FROM sync_state;"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -15,6 +15,7 @@
     "build:lib": "npm run build --workspace=lib",
     "build:sync": "npm run build --workspace=services/sync-service",
     "inspect-db": "./scripts/inspect-db.sh",
+    "sync-history": "ts-node scripts/view-sync-history.ts",
     "start": "node services/sync-service/dist/worker.js"
   },
   "keywords": [

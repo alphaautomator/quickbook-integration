@@ -77,5 +77,35 @@ export function initializeSchema(db: Database): void {
     )
   `);
 
+  // Sync history table - logs every sync operation
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      realm_id TEXT NOT NULL,
+      object_type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      records_synced INTEGER NOT NULL DEFAULT 0,
+      records_failed INTEGER NOT NULL DEFAULT 0,
+      duration_ms INTEGER,
+      cursor_before TEXT,
+      cursor_after TEXT,
+      error_message TEXT,
+      started_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `);
+
+  // Add indexes for sync history queries
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_sync_history_realm_object 
+    ON sync_history(realm_id, object_type)
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_sync_history_started_at 
+    ON sync_history(started_at DESC)
+  `);
+
   logger.info('Database schema initialized successfully');
 }

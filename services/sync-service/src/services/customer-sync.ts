@@ -1,5 +1,5 @@
 import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
-import { customerRepository, syncStateRepository } from '../repositories';
+import { customerRepository, syncStateRepository, syncHistoryRepository } from '../repositories';
 
 export class CustomerSyncService {
   private qb: QuickBooks;
@@ -16,19 +16,27 @@ export class CustomerSyncService {
    */
   async sync(): Promise<{ synced: number; errors: number }> {
     logger.info(`Starting customer sync for realm: ${this.realmId}`);
+    
+    const startTime = Date.now();
+    let recordsSynced = 0;
+    let recordsFailed = 0;
+    let cursorBefore: string | undefined;
+    let cursorAfter: string | undefined;
+    let errorMessage: string | undefined;
+    let syncStatus: 'success' | 'failure' | 'partial' = 'success';
 
     try {
       // Mark sync as in progress
-       syncStateRepository.markInProgress(this.realmId, 'customer');
+      syncStateRepository.markInProgress(this.realmId, 'customer');
 
       // Get last sync cursor
       const state = syncStateRepository.get(this.realmId, 'customer');
-      const cursor = state.cursor;
+      cursorBefore = state.cursor || undefined;
 
       // Build query
       const maxResults = config.quickbooks.maxResults;
-      const query = cursor
-        ? `SELECT * FROM Customer WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS ${maxResults}`
+      const query = cursorBefore
+        ? `SELECT * FROM Customer WHERE Metadata.LastUpdatedTime > '${cursorBefore}' MAXRESULTS ${maxResults}`
         : `SELECT * FROM Customer MAXRESULTS ${maxResults}`;
 
       logger.debug(`Executing customer query: ${query}`);
@@ -42,7 +50,24 @@ export class CustomerSyncService {
 
       if (customers.length === 0) {
         // No new customers, mark success with existing cursor
-         syncStateRepository.markSuccess(this.realmId, 'customer', cursor);
+        syncStateRepository.markSuccess(this.realmId, 'customer', cursorBefore);
+        cursorAfter = cursorBefore;
+        
+        // Log history
+        const endTime = Date.now();
+        syncHistoryRepository.create({
+          realmId: this.realmId,
+          objectType: 'customer',
+          status: 'success',
+          recordsSynced: 0,
+          recordsFailed: 0,
+          durationMs: endTime - startTime,
+          cursorBefore,
+          cursorAfter,
+          startedAt: startTime,
+          completedAt: endTime,
+        });
+        
         return { synced: 0, errors: 0 };
       }
 
@@ -54,26 +79,63 @@ export class CustomerSyncService {
       }));
 
       customerRepository.batchUpsert(customersToUpsert);
+      recordsSynced = customers.length;
 
       // Calculate new cursor (max LastUpdatedTime from batch)
       const newCursor = this.getMaxTimestamp(customers);
+      cursorAfter = newCursor;
       logger.debug(`New cursor for customers: ${newCursor}`);
 
       // Mark sync as successful
-       syncStateRepository.markSuccess(this.realmId, 'customer', newCursor);
+      syncStateRepository.markSuccess(this.realmId, 'customer', newCursor);
 
       logger.info(`Customer sync completed: ${customers.length} records synced`);
+      
+      // Log history
+      const endTime = Date.now();
+      syncHistoryRepository.create({
+        realmId: this.realmId,
+        objectType: 'customer',
+        status: 'success',
+        recordsSynced,
+        recordsFailed: 0,
+        durationMs: endTime - startTime,
+        cursorBefore,
+        cursorAfter,
+        startedAt: startTime,
+        completedAt: endTime,
+      });
+      
       return { synced: customers.length, errors: 0 };
 
     } catch (error: any) {
       logger.error(`Customer sync failed: ${error.message}`);
+      syncStatus = 'failure';
+      errorMessage = error.message;
+      recordsFailed = 1;
       
       // Mark sync as failed
-       syncStateRepository.markFailure(
+      syncStateRepository.markFailure(
         this.realmId,
         'customer',
         error.message
       );
+
+      // Log history
+      const endTime = Date.now();
+      syncHistoryRepository.create({
+        realmId: this.realmId,
+        objectType: 'customer',
+        status: 'failure',
+        recordsSynced,
+        recordsFailed,
+        durationMs: endTime - startTime,
+        cursorBefore,
+        cursorAfter: cursorBefore, // Keep same cursor on failure
+        errorMessage,
+        startedAt: startTime,
+        completedAt: endTime,
+      });
 
       return { synced: 0, errors: 1 };
     }

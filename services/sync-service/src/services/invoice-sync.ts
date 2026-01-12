@@ -1,5 +1,5 @@
 import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
-import { invoiceRepository, syncStateRepository } from '../repositories';
+import { invoiceRepository, syncStateRepository, syncHistoryRepository } from '../repositories';
 
 export class InvoiceSyncService {
   private qb: QuickBooks;
@@ -16,19 +16,27 @@ export class InvoiceSyncService {
    */
   async sync(): Promise<{ synced: number; errors: number }> {
     logger.info(`Starting invoice sync for realm: ${this.realmId}`);
+    
+    const startTime = Date.now();
+    let recordsSynced = 0;
+    let recordsFailed = 0;
+    let cursorBefore: string | undefined;
+    let cursorAfter: string | undefined;
+    let errorMessage: string | undefined;
+    let syncStatus: 'success' | 'failure' | 'partial' = 'success';
 
     try {
       // Mark sync as in progress
-       syncStateRepository.markInProgress(this.realmId, 'invoice');
+      syncStateRepository.markInProgress(this.realmId, 'invoice');
 
       // Get last sync cursor
-      const state =  syncStateRepository.get(this.realmId, 'invoice');
-      const cursor = state.cursor;
+      const state = syncStateRepository.get(this.realmId, 'invoice');
+      cursorBefore = state.cursor || undefined;
 
       // Build query
       const maxResults = config.quickbooks.maxResults;
-      const query = cursor
-        ? `SELECT * FROM Invoice WHERE Metadata.LastUpdatedTime > '${cursor}' MAXRESULTS ${maxResults}`
+      const query = cursorBefore
+        ? `SELECT * FROM Invoice WHERE Metadata.LastUpdatedTime > '${cursorBefore}' MAXRESULTS ${maxResults}`
         : `SELECT * FROM Invoice MAXRESULTS ${maxResults}`;
 
       logger.debug(`Executing invoice query: ${query}`);
@@ -42,7 +50,24 @@ export class InvoiceSyncService {
 
       if (invoices.length === 0) {
         // No new invoices, mark success with existing cursor
-         syncStateRepository.markSuccess(this.realmId, 'invoice', cursor);
+        syncStateRepository.markSuccess(this.realmId, 'invoice', cursorBefore);
+        cursorAfter = cursorBefore;
+        
+        // Log history
+        const endTime = Date.now();
+        syncHistoryRepository.create({
+          realmId: this.realmId,
+          objectType: 'invoice',
+          status: 'success',
+          recordsSynced: 0,
+          recordsFailed: 0,
+          durationMs: endTime - startTime,
+          cursorBefore,
+          cursorAfter,
+          startedAt: startTime,
+          completedAt: endTime,
+        });
+        
         return { synced: 0, errors: 0 };
       }
 
@@ -55,26 +80,63 @@ export class InvoiceSyncService {
       }));
 
       invoiceRepository.batchUpsert(invoicesToUpsert);
+      recordsSynced = invoices.length;
 
       // Calculate new cursor (max LastUpdatedTime from batch)
       const newCursor = this.getMaxTimestamp(invoices);
+      cursorAfter = newCursor;
       logger.debug(`New cursor for invoices: ${newCursor}`);
 
       // Mark sync as successful
-       syncStateRepository.markSuccess(this.realmId, 'invoice', newCursor);
+      syncStateRepository.markSuccess(this.realmId, 'invoice', newCursor);
 
       logger.info(`Invoice sync completed: ${invoices.length} records synced`);
+      
+      // Log history
+      const endTime = Date.now();
+      syncHistoryRepository.create({
+        realmId: this.realmId,
+        objectType: 'invoice',
+        status: 'success',
+        recordsSynced,
+        recordsFailed: 0,
+        durationMs: endTime - startTime,
+        cursorBefore,
+        cursorAfter,
+        startedAt: startTime,
+        completedAt: endTime,
+      });
+      
       return { synced: invoices.length, errors: 0 };
 
     } catch (error: any) {
       logger.error(`Invoice sync failed: ${error.message}`);
+      syncStatus = 'failure';
+      errorMessage = error.message;
+      recordsFailed = 1;
       
       // Mark sync as failed
-       syncStateRepository.markFailure(
+      syncStateRepository.markFailure(
         this.realmId,
         'invoice',
         error.message
       );
+
+      // Log history
+      const endTime = Date.now();
+      syncHistoryRepository.create({
+        realmId: this.realmId,
+        objectType: 'invoice',
+        status: 'failure',
+        recordsSynced,
+        recordsFailed,
+        durationMs: endTime - startTime,
+        cursorBefore,
+        cursorAfter: cursorBefore, // Keep same cursor on failure
+        errorMessage,
+        startedAt: startTime,
+        completedAt: endTime,
+      });
 
       return { synced: 0, errors: 1 };
     }
