@@ -5,7 +5,8 @@ import {
   validateConfig,
   initializeDatabase,
   tokenRepository,
-  logger
+  logger,
+  ObjectType
 } from '../lib/src/index';
 import { syncHistoryRepository } from '../services/sync-service/src/repositories';
 
@@ -21,7 +22,7 @@ import { syncHistoryRepository } from '../services/sync-service/src/repositories
 interface Options {
   full: boolean;
   limit: number;
-  objectType?: 'customer' | 'invoice';
+  objectType?: ObjectType;
 }
 
 function parseArgs(): Options {
@@ -42,8 +43,8 @@ function parseArgs(): Options {
         break;
       case '--type':
         const type = args[i + 1];
-        if (type === 'customer' || type === 'invoice') {
-          options.objectType = type;
+        if (type === ObjectType.CUSTOMER || type === ObjectType.INVOICE) {
+          options.objectType = type as ObjectType;
         }
         i++;
         break;

@@ -1,4 +1,4 @@
-import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
+import { QuickBooks, logger, config, ObjectType, SyncHistoryStatus } from '@quickbooks-integration/lib';
 import { invoiceRepository, syncStateRepository, syncHistoryRepository } from '../repositories';
 
 export class InvoiceSyncService {
@@ -23,14 +23,14 @@ export class InvoiceSyncService {
     let cursorBefore: string | undefined;
     let cursorAfter: string | undefined;
     let errorMessage: string | undefined;
-    let syncStatus: 'success' | 'failure' | 'partial' = 'success';
+    let syncStatus: SyncHistoryStatus = SyncHistoryStatus.SUCCESS;
 
     try {
       // Mark sync as in progress
-      syncStateRepository.markInProgress(this.realmId, 'invoice');
+      syncStateRepository.markInProgress(this.realmId, ObjectType.INVOICE);
 
       // Get last sync cursor
-      const state = syncStateRepository.get(this.realmId, 'invoice');
+      const state = syncStateRepository.get(this.realmId, ObjectType.INVOICE);
       cursorBefore = state.cursor || undefined;
 
       // Build query
@@ -50,15 +50,15 @@ export class InvoiceSyncService {
 
       if (invoices.length === 0) {
         // No new invoices, mark success with existing cursor
-        syncStateRepository.markSuccess(this.realmId, 'invoice', cursorBefore);
+        syncStateRepository.markSuccess(this.realmId, ObjectType.INVOICE, cursorBefore);
         cursorAfter = cursorBefore;
         
         // Log history
         const endTime = Date.now();
         syncHistoryRepository.create({
           realmId: this.realmId,
-          objectType: 'invoice',
-          status: 'success',
+          objectType: ObjectType.INVOICE,
+          status: SyncHistoryStatus.SUCCESS,
           recordsSynced: 0,
           recordsFailed: 0,
           durationMs: endTime - startTime,
@@ -88,7 +88,7 @@ export class InvoiceSyncService {
       logger.debug(`New cursor for invoices: ${newCursor}`);
 
       // Mark sync as successful
-      syncStateRepository.markSuccess(this.realmId, 'invoice', newCursor);
+      syncStateRepository.markSuccess(this.realmId, ObjectType.INVOICE, newCursor);
 
       logger.info(`Invoice sync completed: ${invoices.length} records synced`);
       
@@ -96,8 +96,8 @@ export class InvoiceSyncService {
       const endTime = Date.now();
       syncHistoryRepository.create({
         realmId: this.realmId,
-        objectType: 'invoice',
-        status: 'success',
+        objectType: ObjectType.INVOICE,
+        status: SyncHistoryStatus.SUCCESS,
         recordsSynced,
         recordsFailed: 0,
         durationMs: endTime - startTime,
@@ -111,14 +111,14 @@ export class InvoiceSyncService {
 
     } catch (error: any) {
       logger.error(`Invoice sync failed: ${error.message}`);
-      syncStatus = 'failure';
+      syncStatus = SyncHistoryStatus.FAILURE;
       errorMessage = error.message;
       recordsFailed = 1;
       
       // Mark sync as failed
       syncStateRepository.markFailure(
         this.realmId,
-        'invoice',
+        ObjectType.INVOICE,
         error.message
       );
 
@@ -126,8 +126,8 @@ export class InvoiceSyncService {
       const endTime = Date.now();
       syncHistoryRepository.create({
         realmId: this.realmId,
-        objectType: 'invoice',
-        status: 'failure',
+        objectType: ObjectType.INVOICE,
+        status: SyncHistoryStatus.FAILURE,
         recordsSynced,
         recordsFailed,
         durationMs: endTime - startTime,
@@ -176,7 +176,7 @@ export class InvoiceSyncService {
     cursor?: string;
   }> {
     const count = invoiceRepository.countByRealmId(this.realmId);
-    const state =  syncStateRepository.get(this.realmId, 'invoice');
+    const state = syncStateRepository.get(this.realmId, ObjectType.INVOICE);
 
     return {
       totalInvoices: count,
@@ -191,6 +191,6 @@ export class InvoiceSyncService {
    */
   async reset(): Promise<void> {
     logger.warn(`Resetting invoice sync state for realm: ${this.realmId}`);
-     syncStateRepository.reset(this.realmId, 'invoice');
+    syncStateRepository.reset(this.realmId, ObjectType.INVOICE);
   }
 }

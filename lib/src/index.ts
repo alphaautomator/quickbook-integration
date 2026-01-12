@@ -19,3 +19,6 @@ export type { TokenData } from './database/repositories/token.repository';
 // Config and utilities
 export { config, validateConfig } from './config';
 export { logger } from './utils/logger';
+
+// Types and enums
+export { ObjectType, SyncStatus, SyncHistoryStatus } from './types';

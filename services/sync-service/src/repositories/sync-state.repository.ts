@@ -1,11 +1,11 @@
-import { getDb, logger } from '@quickbooks-integration/lib';
+import { getDb, logger, ObjectType, SyncStatus } from '@quickbooks-integration/lib';
 
-export type SyncStatus = 'pending' | 'in_progress' | 'success' | 'failure';
+export { SyncStatus, ObjectType };
 
 export interface SyncState {
   id?: number;
   realmId: string;
-  objectType: string;
+  objectType: ObjectType;
   lastSyncAttempt?: number;
   lastSyncSuccess?: number;
   status: SyncStatus;
@@ -19,7 +19,7 @@ export class SyncStateRepository {
   /**
    * Get sync state for a specific object type
    */
-  get(realmId: string, objectType: string): SyncState {
+  get(realmId: string, objectType: ObjectType): SyncState {
     const db = getDb();
 
     const stmt = db.prepare(`
@@ -45,7 +45,7 @@ export class SyncStateRepository {
       return {
         realmId,
         objectType,
-        status: 'pending',
+        status: SyncStatus.PENDING,
         cursor: undefined
       };
     }
@@ -82,7 +82,7 @@ export class SyncStateRepository {
   /**
    * Mark sync as in progress
    */
-  markInProgress(realmId: string, objectType: string): void {
+  markInProgress(realmId: string, objectType: ObjectType): void {
     const db = getDb();
     const now = Date.now();
 
@@ -102,7 +102,7 @@ export class SyncStateRepository {
   /**
    * Mark sync as successful
    */
-  markSuccess(realmId: string, objectType: string, cursor?: string): void {
+  markSuccess(realmId: string, objectType: ObjectType, cursor?: string): void {
     const db = getDb();
     const now = Date.now();
 
@@ -127,7 +127,7 @@ export class SyncStateRepository {
   /**
    * Mark sync as failed
    */
-  markFailure(realmId: string, objectType: string, errorMessage: string): void {
+  markFailure(realmId: string, objectType: ObjectType, errorMessage: string): void {
     const db = getDb();
     const now = Date.now();
 
@@ -149,7 +149,7 @@ export class SyncStateRepository {
   /**
    * Update cursor without changing status
    */
-  updateCursor(realmId: string, objectType: string, cursor: string): void {
+  updateCursor(realmId: string, objectType: ObjectType, cursor: string): void {
     const db = getDb();
     const now = Date.now();
 
@@ -166,7 +166,7 @@ export class SyncStateRepository {
   /**
    * Reset sync state for an object type
    */
-  reset(realmId: string, objectType: string): void {
+  reset(realmId: string, objectType: ObjectType): void {
     const db = getDb();
     const now = Date.now();
 
@@ -189,7 +189,7 @@ export class SyncStateRepository {
   /**
    * Delete sync state
    */
-  delete(realmId: string, objectType: string): void {
+  delete(realmId: string, objectType: ObjectType): void {
     const db = getDb();
     const stmt = db.prepare('DELETE FROM sync_state WHERE realm_id = ? AND object_type = ?');
     stmt.run(realmId, objectType);
@@ -209,9 +209,9 @@ export class SyncStateRepository {
   /**
    * Check if a sync is currently in progress
    */
-  isInProgress(realmId: string, objectType: string): boolean {
+  isInProgress(realmId: string, objectType: ObjectType): boolean {
     const state = this.get(realmId, objectType);
-    return state.status === 'in_progress';
+    return state.status === SyncStatus.IN_PROGRESS;
   }
 }
 

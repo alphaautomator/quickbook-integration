@@ -1,4 +1,4 @@
-import { QuickBooks, logger, config } from '@quickbooks-integration/lib';
+import { QuickBooks, logger, config, ObjectType, SyncHistoryStatus } from '@quickbooks-integration/lib';
 import { customerRepository, syncStateRepository, syncHistoryRepository } from '../repositories';
 
 export class CustomerSyncService {
@@ -23,14 +23,14 @@ export class CustomerSyncService {
     let cursorBefore: string | undefined;
     let cursorAfter: string | undefined;
     let errorMessage: string | undefined;
-    let syncStatus: 'success' | 'failure' | 'partial' = 'success';
+    let syncStatus: SyncHistoryStatus = SyncHistoryStatus.SUCCESS;
 
     try {
       // Mark sync as in progress
-      syncStateRepository.markInProgress(this.realmId, 'customer');
+      syncStateRepository.markInProgress(this.realmId, ObjectType.CUSTOMER);
 
       // Get last sync cursor
-      const state = syncStateRepository.get(this.realmId, 'customer');
+      const state = syncStateRepository.get(this.realmId, ObjectType.CUSTOMER);
       cursorBefore = state.cursor || undefined;
 
       // Build query
@@ -50,15 +50,15 @@ export class CustomerSyncService {
 
       if (customers.length === 0) {
         // No new customers, mark success with existing cursor
-        syncStateRepository.markSuccess(this.realmId, 'customer', cursorBefore);
+        syncStateRepository.markSuccess(this.realmId, ObjectType.CUSTOMER, cursorBefore);
         cursorAfter = cursorBefore;
         
         // Log history
         const endTime = Date.now();
         syncHistoryRepository.create({
           realmId: this.realmId,
-          objectType: 'customer',
-          status: 'success',
+          objectType: ObjectType.CUSTOMER,
+          status: SyncHistoryStatus.SUCCESS,
           recordsSynced: 0,
           recordsFailed: 0,
           durationMs: endTime - startTime,
@@ -87,7 +87,7 @@ export class CustomerSyncService {
       logger.debug(`New cursor for customers: ${newCursor}`);
 
       // Mark sync as successful
-      syncStateRepository.markSuccess(this.realmId, 'customer', newCursor);
+      syncStateRepository.markSuccess(this.realmId, ObjectType.CUSTOMER, newCursor);
 
       logger.info(`Customer sync completed: ${customers.length} records synced`);
       
@@ -95,8 +95,8 @@ export class CustomerSyncService {
       const endTime = Date.now();
       syncHistoryRepository.create({
         realmId: this.realmId,
-        objectType: 'customer',
-        status: 'success',
+        objectType: ObjectType.CUSTOMER,
+        status: SyncHistoryStatus.SUCCESS,
         recordsSynced,
         recordsFailed: 0,
         durationMs: endTime - startTime,
@@ -110,14 +110,14 @@ export class CustomerSyncService {
 
     } catch (error: any) {
       logger.error(`Customer sync failed: ${error.message}`);
-      syncStatus = 'failure';
+      syncStatus = SyncHistoryStatus.FAILURE;
       errorMessage = error.message;
       recordsFailed = 1;
       
       // Mark sync as failed
       syncStateRepository.markFailure(
         this.realmId,
-        'customer',
+        ObjectType.CUSTOMER,
         error.message
       );
 
@@ -125,8 +125,8 @@ export class CustomerSyncService {
       const endTime = Date.now();
       syncHistoryRepository.create({
         realmId: this.realmId,
-        objectType: 'customer',
-        status: 'failure',
+        objectType: ObjectType.CUSTOMER,
+        status: SyncHistoryStatus.FAILURE,
         recordsSynced,
         recordsFailed,
         durationMs: endTime - startTime,
@@ -168,7 +168,7 @@ export class CustomerSyncService {
     cursor?: string;
   }> {
     const count = customerRepository.countByRealmId(this.realmId);
-    const state = syncStateRepository.get(this.realmId, 'customer');
+    const state = syncStateRepository.get(this.realmId, ObjectType.CUSTOMER);
 
     return {
       totalCustomers: count,
@@ -183,6 +183,6 @@ export class CustomerSyncService {
    */
   async reset(): Promise<void> {
     logger.warn(`Resetting customer sync state for realm: ${this.realmId}`);
-     syncStateRepository.reset(this.realmId, 'customer');
+    syncStateRepository.reset(this.realmId, ObjectType.CUSTOMER);
   }
 }

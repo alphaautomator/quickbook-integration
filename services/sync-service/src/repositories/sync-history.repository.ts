@@ -1,11 +1,12 @@
-import { getDb } from '@quickbooks-integration/lib';
-import { logger } from '@quickbooks-integration/lib';
+import { getDb, logger, ObjectType, SyncHistoryStatus } from '@quickbooks-integration/lib';
+
+export { ObjectType, SyncHistoryStatus };
 
 export interface SyncHistoryRecord {
   id?: number;
   realmId: string;
-  objectType: string;
-  status: 'success' | 'failure' | 'partial';
+  objectType: ObjectType;
+  status: SyncHistoryStatus;
   recordsSynced: number;
   recordsFailed: number;
   durationMs?: number;
@@ -18,13 +19,13 @@ export interface SyncHistoryRecord {
 }
 
 export interface SyncHistorySummary {
-  objectType: string;
+  objectType: ObjectType;
   totalSyncs: number;
   successfulSyncs: number;
   failedSyncs: number;
   totalRecordsSynced: number;
   lastSyncTime: string | null;
-  lastSyncStatus: string;
+  lastSyncStatus: SyncHistoryStatus;
 }
 
 class SyncHistoryRepository {
@@ -68,7 +69,7 @@ class SyncHistoryRepository {
    */
   findByRealmAndType(
     realmId: string,
-    objectType: string,
+    objectType: ObjectType,
     limit: number = 50
   ): SyncHistoryRecord[] {
     const db = getDb();
@@ -128,7 +129,7 @@ class SyncHistoryRepository {
   /**
    * Get the most recent sync history record
    */
-  findMostRecent(realmId: string, objectType: string): SyncHistoryRecord | null {
+  findMostRecent(realmId: string, objectType: ObjectType): SyncHistoryRecord | null {
     const db = getDb();
     const stmt = db.prepare(`
       SELECT 
@@ -205,7 +206,7 @@ class SyncHistoryRepository {
   /**
    * Get sync history count
    */
-  count(realmId?: string, objectType?: string): number {
+  count(realmId?: string, objectType?: ObjectType): number {
     const db = getDb();
     let query = 'SELECT COUNT(*) as count FROM sync_history';
     const params: any[] = [];
