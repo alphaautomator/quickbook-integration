@@ -96,6 +96,8 @@ quickbook-integration/
 │       │   ├── schema.ts         # Database table definitions
 │       │   └── repositories/
 │       │       └── token.repository.ts  # Token storage/retrieval
+│       ├── types/
+│       │   └── index.ts          # Shared enums (ObjectType, SyncStatus)
 │       ├── config.ts             # Environment configuration
 │       └── utils/
 │           └── logger.ts         # Logging utility
@@ -107,13 +109,15 @@ quickbook-integration/
 │           ├── repositories/     # Data access layer
 │           │   ├── customer.repository.ts
 │           │   ├── invoice.repository.ts
-│           │   └── sync-state.repository.ts
+│           │   ├── sync-state.repository.ts
+│           │   └── sync-history.repository.ts  # Sync operation history
 │           └── services/         # Sync business logic
 │               ├── customer-sync.ts
 │               └── invoice-sync.ts
 │
 ├── scripts/
 │   ├── bootstrap.ts              # One-time token exchange CLI
+│   ├── view-sync-history.ts     # View historical sync operations
 │   └── inspect-db.sh             # Database inspection tool
 │
 └── [config files]
