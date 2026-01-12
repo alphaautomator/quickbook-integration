@@ -5,17 +5,17 @@
   "private": true,
   "workspaces": [
     "lib",
-    "services/auth-service",
     "services/sync-service"
   ],
   "scripts": {
-    "dev:auth": "npm run dev --workspace=services/auth-service",
+    "bootstrap": "ts-node scripts/bootstrap.ts",
     "dev:sync": "npm run dev --workspace=services/sync-service",
-    "dev": "concurrently \"npm run dev:auth\" \"npm run dev:sync\"",
+    "dev": "npm run dev:sync",
     "build": "npm run build --workspaces",
     "build:lib": "npm run build --workspace=lib",
-    "build:auth": "npm run build --workspace=services/auth-service",
-    "build:sync": "npm run build --workspace=services/sync-service"
+    "build:sync": "npm run build --workspace=services/sync-service",
+    "inspect-db": "./scripts/inspect-db.sh",
+    "start": "node services/sync-service/dist/worker.js"
   },
   "keywords": [
     "quickbooks",
