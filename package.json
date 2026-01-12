@@ -1,0 +1,33 @@
+{
+  "name": "quickbooks-integration",
+  "version": "1.0.0",
+  "description": "QuickBooks Online integration service with OAuth and continuous data sync",
+  "private": true,
+  "workspaces": [
+    "lib",
+    "services/auth-service",
+    "services/sync-service"
+  ],
+  "scripts": {
+    "dev:auth": "npm run dev --workspace=services/auth-service",
+    "dev:sync": "npm run dev --workspace=services/sync-service",
+    "dev": "concurrently \"npm run dev:auth\" \"npm run dev:sync\"",
+    "build": "npm run build --workspaces",
+    "build:lib": "npm run build --workspace=lib",
+    "build:auth": "npm run build --workspace=services/auth-service",
+    "build:sync": "npm run build --workspace=services/sync-service"
+  },
+  "keywords": [
+    "quickbooks",
+    "oauth",
+    "integration",
+    "sync"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}
