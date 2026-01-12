@@ -87,10 +87,16 @@ export class QuickBooks {
 
       return response.data;
     } catch (error: any) {
-      // Handle rate limiting (429)
-      if (error.response?.status === 429 && retryCount < 3) {
+      // Handle retryable errors (429, 503, 408, etc.)
+      const statusCode = error.response?.status;
+      const isRetryable = statusCode && config.quickbooks.retryableErrorCodes.includes(statusCode);
+      
+      if (isRetryable && retryCount < config.quickbooks.maxRetries) {
         const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
-        logger.warn(`Rate limited on ${endpoint}. Waiting ${retryAfter}s before retry ${retryCount + 1}/3`);
+        logger.warn(
+          `Retryable error ${statusCode} on ${endpoint}. ` +
+          `Waiting ${retryAfter}s before retry ${retryCount + 1}/${config.quickbooks.maxRetries}`
+        );
         
         await this.sleep(retryAfter * 1000);
         return this.get<T>(endpoint, params, retryCount + 1);
@@ -122,10 +128,16 @@ export class QuickBooks {
 
       return response.data;
     } catch (error: any) {
-      // Handle rate limiting (429)
-      if (error.response?.status === 429 && retryCount < 3) {
+      // Handle retryable errors (429, 503, 408, etc.)
+      const statusCode = error.response?.status;
+      const isRetryable = statusCode && config.quickbooks.retryableErrorCodes.includes(statusCode);
+      
+      if (isRetryable && retryCount < config.quickbooks.maxRetries) {
         const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
-        logger.warn(`Rate limited on ${endpoint}. Waiting ${retryAfter}s before retry ${retryCount + 1}/3`);
+        logger.warn(
+          `Retryable error ${statusCode} on ${endpoint}. ` +
+          `Waiting ${retryAfter}s before retry ${retryCount + 1}/${config.quickbooks.maxRetries}`
+        );
         
         await this.sleep(retryAfter * 1000);
         return this.post<T>(endpoint, body, retryCount + 1);

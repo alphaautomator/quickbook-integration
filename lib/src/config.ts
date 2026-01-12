@@ -17,7 +17,12 @@ export const config = {
       ? 'https://appcenter.intuit.com/connect/oauth2'
       : 'https://appcenter.intuit.com/connect/oauth2',
     tokenUrl: 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer',
-    maxResults: parseInt(process.env.QB_MAX_RESULTS || '1000', 10)
+    maxResults: parseInt(process.env.QB_MAX_RESULTS || '1000', 10),
+    retryableErrorCodes: (process.env.QB_RETRYABLE_ERROR_CODES || '429,503,408')
+      .split(',')
+      .map(code => parseInt(code.trim(), 10))
+      .filter(code => !isNaN(code)),
+    maxRetries: parseInt(process.env.QB_MAX_RETRIES || '3', 10)
   },
   database: {
     path: process.env.DATABASE_PATH || './quickbooks.db'
