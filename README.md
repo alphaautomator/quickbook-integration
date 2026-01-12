@@ -49,6 +49,8 @@ QB_REALM_ID=your_realm_id
 # Optional - defaults provided
 QB_ENVIRONMENT=sandbox
 QB_MAX_RESULTS=1000
+QB_RETRYABLE_ERROR_CODES=429,503,408
+QB_MAX_RETRIES=3
 DATABASE_PATH=./quickbooks.db
 SYNC_INTERVAL_MINUTES=5
 ```
@@ -243,8 +245,10 @@ All configuration is done via environment variables in `.env`:
 | `QB_ENVIRONMENT` | No | `sandbox` | `sandbox` or `production` |
 | `QB_REDIRECT_URI` | No | OAuth Playground URL | Must match where code was obtained |
 | `QB_MAX_RESULTS` | No | `1000` | Max records per API request (1-1000) |
+| `QB_RETRYABLE_ERROR_CODES` | No | `429,503,408` | Comma-separated HTTP error codes to retry |
+| `QB_MAX_RETRIES` | No | `3` | Maximum number of retry attempts |
 | `DATABASE_PATH` | No | `./quickbooks.db` | Path to SQLite database |
-| `SYNC_INTERVAL_MINUTES` | No | `5` | How often to sync |
+| `SYNC_INTERVAL_MINUTES` | No | `5` | How often to sync (not currently used - runs every minute) |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Production Deployment
