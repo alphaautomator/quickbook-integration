@@ -173,7 +173,7 @@ async function main() {
   currentSyncPromise = null;
 
   // Schedule recurring syncs using cron - every minute
-  const cronExpression = '* * * * *';  // Every minute
+  const cronExpression = '*/5 * * * *';  // Every 5 minutes
   logger.info(`Scheduling recurring syncs: ${cronExpression} (every minute)`);
 
   cronTask = cron.schedule(cronExpression, async () => {
