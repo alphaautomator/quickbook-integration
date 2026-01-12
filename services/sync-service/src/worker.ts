@@ -51,29 +51,51 @@ async function performSync(): Promise<void> {
     let totalSynced = 0;
     let totalErrors = 0;
 
-    // Sync customers
-    try {
-      const customerResult = await customerSync.sync();
-      totalSynced += customerResult.synced;
-      totalErrors += customerResult.errors;
+    // Sync customers and invoices concurrently
+    logger.info('Starting concurrent sync for customers and invoices');
 
-      const customerStats = await customerSync.getStats();
-      logger.info(`Customer stats: ${customerStats.totalCustomers} total in DB`);
-    } catch (error: any) {
-      logger.error('Customer sync threw unexpected error:', error);
+    const [customerResult, invoiceResult] = await Promise.allSettled([
+      // Customer sync
+      (async () => {
+        try {
+          const result = await customerSync.sync();
+          const stats = await customerSync.getStats();
+          logger.info(`Customer stats: ${stats.totalCustomers} total in DB`);
+          return result;
+        } catch (error: any) {
+          logger.error('Customer sync threw unexpected error:', error);
+          return { synced: 0, errors: 1 };
+        }
+      })(),
+      
+      // Invoice sync
+      (async () => {
+        try {
+          const result = await invoiceSync.sync();
+          const stats = await invoiceSync.getStats();
+          logger.info(`Invoice stats: ${stats.totalInvoices} total in DB`);
+          return result;
+        } catch (error: any) {
+          logger.error('Invoice sync threw unexpected error:', error);
+          return { synced: 0, errors: 1 };
+        }
+      })()
+    ]);
+
+    // Aggregate results
+    if (customerResult.status === 'fulfilled') {
+      totalSynced += customerResult.value.synced;
+      totalErrors += customerResult.value.errors;
+    } else {
+      logger.error('Customer sync failed:', customerResult.reason);
       totalErrors++;
     }
 
-    // Sync invoices
-    try {
-      const invoiceResult = await invoiceSync.sync();
-      totalSynced += invoiceResult.synced;
-      totalErrors += invoiceResult.errors;
-
-      const invoiceStats = await invoiceSync.getStats();
-      logger.info(`Invoice stats: ${invoiceStats.totalInvoices} total in DB`);
-    } catch (error: any) {
-      logger.error('Invoice sync threw unexpected error:', error);
+    if (invoiceResult.status === 'fulfilled') {
+      totalSynced += invoiceResult.value.synced;
+      totalErrors += invoiceResult.value.errors;
+    } else {
+      logger.error('Invoice sync failed:', invoiceResult.reason);
       totalErrors++;
     }
 
