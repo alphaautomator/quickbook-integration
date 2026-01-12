@@ -70,9 +70,9 @@ export class QuickBooks {
   }
 
   /**
-   * Make authenticated GET request to QuickBooks API
+   * Make authenticated GET request to QuickBooks API with rate limit handling
    */
-  async get<T = any>(endpoint: string, params?: Record<string, any>): Promise<T> {
+  async get<T = any>(endpoint: string, params?: Record<string, any>, retryCount = 0): Promise<T> {
     const token = await this.getValidToken();
 
     try {
@@ -87,15 +87,24 @@ export class QuickBooks {
 
       return response.data;
     } catch (error: any) {
+      // Handle rate limiting (429)
+      if (error.response?.status === 429 && retryCount < 3) {
+        const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
+        logger.warn(`Rate limited on ${endpoint}. Waiting ${retryAfter}s before retry ${retryCount + 1}/3`);
+        
+        await this.sleep(retryAfter * 1000);
+        return this.get<T>(endpoint, params, retryCount + 1);
+      }
+
       this.handleApiError(error, 'GET', endpoint);
       throw error;
     }
   }
 
   /**
-   * Make authenticated POST request to QuickBooks API
+   * Make authenticated POST request to QuickBooks API with rate limit handling
    */
-  async post<T = any>(endpoint: string, body: any): Promise<T> {
+  async post<T = any>(endpoint: string, body: any, retryCount = 0): Promise<T> {
     const token = await this.getValidToken();
 
     try {
@@ -113,6 +122,15 @@ export class QuickBooks {
 
       return response.data;
     } catch (error: any) {
+      // Handle rate limiting (429)
+      if (error.response?.status === 429 && retryCount < 3) {
+        const retryAfter = parseInt(error.response.headers['retry-after'] || '60');
+        logger.warn(`Rate limited on ${endpoint}. Waiting ${retryAfter}s before retry ${retryCount + 1}/3`);
+        
+        await this.sleep(retryAfter * 1000);
+        return this.post<T>(endpoint, body, retryCount + 1);
+      }
+
       this.handleApiError(error, 'POST', endpoint);
       throw error;
     }
@@ -216,5 +234,12 @@ export class QuickBooks {
    */
   getRealmId(): string {
     return this.realmId;
+  }
+
+  /**
+   * Sleep helper for rate limit handling
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
