@@ -23,10 +23,21 @@ try {
 initializeDatabase();
 logger.info('Database initialized');
 
+// Shutdown flag and cron task
+let isShuttingDown = false;
+let currentSyncPromise: Promise<void> | null = null;
+let cronTask: cron.ScheduledTask | null = null;
+
 /**
  * Main sync function - syncs all object types for active realm
  */
 async function performSync(): Promise<void> {
+  // Skip if shutting down
+  if (isShuttingDown) {
+    logger.info('Skipping sync - shutdown in progress');
+    return;
+  }
+
   logger.info('=== Starting sync cycle ===');
 
   try {
@@ -115,7 +126,7 @@ async function performSync(): Promise<void> {
     logger.error('Sync cycle failed with unexpected error:', error);
   }
 
-  logger.info(`Next sync in ${config.sync.intervalMinutes} minutes`);
+  logger.info('Next sync in 1 minute');
   logger.info('');
 }
 
@@ -127,7 +138,7 @@ function displayStartupInfo(): void {
   logger.info('QuickBooks Sync Service');
   logger.info('==========================================================');
   logger.info(`Environment: ${config.quickbooks.environment}`);
-  logger.info(`Sync interval: Every ${config.sync.intervalMinutes} minutes`);
+  logger.info('Sync interval: Every minute');
   logger.info(`Database: ${config.database.path}`);
 
   // Check if already authorized
@@ -157,32 +168,71 @@ async function main() {
 
   // Run initial sync immediately
   logger.info('Running initial sync...');
-  await performSync();
+  currentSyncPromise = performSync();
+  await currentSyncPromise;
+  currentSyncPromise = null;
 
-  // Schedule recurring syncs
-  const cronExpression = `*/${config.sync.intervalMinutes} * * * *`;
-  logger.info(`Scheduling recurring syncs: ${cronExpression}`);
+  // Schedule recurring syncs using cron - every minute
+  const cronExpression = '* * * * *';  // Every minute
+  logger.info(`Scheduling recurring syncs: ${cronExpression} (every minute)`);
 
-  cron.schedule(cronExpression, async () => {
-    await performSync();
+  cronTask = cron.schedule(cronExpression, async () => {
+    if (!isShuttingDown) {
+      currentSyncPromise = performSync();
+      await currentSyncPromise;
+      currentSyncPromise = null;
+    }
   });
 
-  logger.info('✅ Sync worker is running');
+  logger.info('Sync worker is running');
   logger.info('Press Ctrl+C to stop');
 }
 
-// Graceful shutdown
-process.on('SIGINT', () => {
+// Graceful shutdown handler
+async function gracefulShutdown(signal: string) {
   logger.info('');
-  logger.info('Shutting down Sync Service...');
-  process.exit(0);
-});
+  logger.info(`Received ${signal}, initiating graceful shutdown...`);
+  
+  // Set shutdown flag to prevent new syncs
+  isShuttingDown = true;
 
-process.on('SIGTERM', () => {
-  logger.info('');
-  logger.info('Shutting down Sync Service...');
+  // Stop cron task
+  if (cronTask) {
+    cronTask.stop();
+    logger.info('Stopped cron scheduler');
+  }
+
+  // Wait for current sync to complete
+  if (currentSyncPromise) {
+    logger.info('Waiting for current sync to complete...');
+    try {
+      await Promise.race([
+        currentSyncPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Sync timeout')), 30000)
+        )
+      ]);
+      logger.info('Current sync completed');
+    } catch (error) {
+      logger.warn('Sync did not complete within timeout, forcing shutdown');
+    }
+  }
+
+  // Close database connections
+  try {
+    const { closeDb } = await import('@quickbooks-integration/lib');
+    closeDb();
+    logger.info('Database connections closed');
+  } catch (error) {
+    logger.error('Error closing database:', error);
+  }
+
+  logger.info('Graceful shutdown complete');
   process.exit(0);
-});
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Handle unhandled errors
 process.on('unhandledRejection', (error: any) => {
